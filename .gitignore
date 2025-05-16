@@ -1,0 +1,19 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+ramco_env/
+
+# Models: track .pkl files, ignore any new artifacts
+models/
+!models/*.pkl
+
+# Data
+data/extracted/
+# allow tracking raw images and PPTs in data/raw
+
+# OS artifacts
+.DS_Store

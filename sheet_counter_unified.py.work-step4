@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+sheet_counter_unified.py
+
+Hybrid counting:
+- If slide-title exists and does NOT contain 'Line', parse exact count from it.
+- Else, extract 4 CV features, feed into pre-trained RF to predict.
+"""
+
+import os, re, glob, pickle
+import cv2
+import numpy as np
+from pptx import Presentation
+from tqdm import tqdm
+from sklearn.cluster import DBSCAN
+
+# ─── CONFIG: point to your freshly retrained RF models ───────────────
+RF_WRAP_PKL   = "rf_wrapped_multi.pkl"
+RF_NOWRAP_PKL = "rf_unwrapped_multi.pkl"
+# Optional linear calibration on RF raw output:
+CALIB_WRAP   = (1.644, -60.7)    # (a, b) if you want final = a*raw + b
+CALIB_NOWRAP = (3.776, -108.2)
+# ─────────────────────────────────────────────────────────────────────
+
+RE_BUNDLES = re.compile(r"(\d+)[×xX*]\s*(\d+)")
+RE_LINE    = re.compile(r"\bLine\b", re.IGNORECASE)
+
+def parse_title_counts(pptx_path, img_dir):
+    prs    = Presentation(pptx_path)
+    slides = list(prs.slides)[1:]
+    mapping = {}
+    for idx, slide in enumerate(slides, start=2):
+        title = ""
+        if slide.shapes.title and slide.shapes.title.has_text_frame:
+            title = slide.shapes.title.text
+        else:
+            for shp in slide.shapes:
+                if getattr(shp, "has_text_frame", False):
+                    title = shp.text
+                    break
+        if RE_LINE.search(title):
+            continue
+        m = RE_BUNDLES.search(title)
+        if not m:
+            continue
+        bundles, per = map(int, m.groups())
+        total = bundles * per
+        img_idx = idx - 1
+        for ext in ("jpg","jpeg","png"):
+            fn = f"image{img_idx}.{ext}"
+            if os.path.exists(os.path.join(img_dir, fn)):
+                mapping[fn] = total
+                break
+    return mapping
+
+def extract_cv_features(img_path):
+    img = cv2.imread(img_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.convertScaleAbs(gray, alpha=1.25, beta=0)
+
+    # Horizontal edges → raw & length
+    sob_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    norm_y = np.uint8(np.abs(sob_y)/(np.abs(sob_y).max()+1e-6)*255)
+    ed_y   = cv2.Canny(norm_y, 50, 150)
+    lines_h = cv2.HoughLinesP(ed_y,1,np.pi/180,150,minLineLength=70,maxLineGap=8)
+
+    raw = 0
+    length = 0.0
+    if lines_h is not None:
+        mids = []
+        for x1,y1,x2,y2 in lines_h[:,0]:
+            ang = abs(np.degrees(np.arctan2(y2-y1, x2-x1)))
+            if ang<5 or ang>175:
+                length += np.hypot(x2-x1,y2-y1)
+                mids.append([(y1+y2)/2.])
+        if mids:
+            labels = DBSCAN(eps=5, min_samples=1).fit(np.vstack(mids)).labels_
+            raw = len(set(labels))
+
+    total_edges = ed_y.sum()/255.0
+
+    # Vertical edges → layer_count
+    sob_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    norm_x = np.uint8(np.abs(sob_x)/(np.abs(sob_x).max()+1e-6)*255)
+    ed_x   = cv2.Canny(norm_x, 50, 150)
+    lines_v = cv2.HoughLinesP(ed_x,1,np.pi/180,100,minLineLength=30,maxLineGap=5)
+
+    layer = 0
+    if lines_v is not None:
+        midsx = []
+        for x1,y1,x2,y2 in lines_v[:,0]:
+            ang = abs(np.degrees(np.arctan2(y2-y1, x2-x1)))
+            if abs(ang-90)<5:
+                midsx.append([(x1+x2)/2.])
+        if midsx:
+            # <-- use midsx here, not a typo'd midxs
+            labels_v = DBSCAN(eps=10, min_samples=1).fit(np.vstack(midsx)).labels_
+            layer = len(set(labels_v))
+
+    return np.array([raw, length, total_edges, layer], dtype=float)
+
+def process_folder(title_map, model_pkl, img_dir, label, calib):
+    pipe = pickle.load(open(model_pkl, "rb"))
+    a, b = calib
+    imgs = sorted(glob.glob(os.path.join(img_dir, "*.jpg")) +
+                  glob.glob(os.path.join(img_dir, "*.jpeg")) +
+                  glob.glob(os.path.join(img_dir, "*.png")))
+    subtotal = 0
+    print(f"\n--- {label} ({len(imgs)} images) ---")
+    for p in tqdm(imgs, desc=label):
+        fn = os.path.basename(p)
+        if fn in title_map:
+            cnt, src = title_map[fn], "title"
+        else:
+            feats = extract_cv_features(p).reshape(1, -1)
+            raw = pipe.predict(feats)[0]
+            cnt = int(round(a*raw + b))
+            src = "model"
+        subtotal += cnt
+        print(f"{fn:25s} → {cnt:3d}   ({src})")
+    print(f"Subtotal {label}: {subtotal}")
+    return subtotal
+
+if __name__=="__main__":
+    import argparse
+    p = argparse.ArgumentParser(__doc__)
+    p.add_argument("--wrap_pptx",   required=True)
+    p.add_argument("--nowrap_pptx", required=True)
+    p.add_argument("--wrap_dir",    required=True)
+    p.add_argument("--nowrap_dir",  required=True)
+    args = p.parse_args()
+
+    wrap_map   = parse_title_counts(args.wrap_pptx,   args.wrap_dir)
+    nowrap_map = parse_title_counts(args.nowrap_pptx, args.nowrap_dir)
+
+    tot_w = process_folder(wrap_map,   RF_WRAP_PKL,   args.wrap_dir,   "Wrapped",   CALIB_WRAP)
+    tot_u = process_folder(nowrap_map, RF_NOWRAP_PKL, args.nowrap_dir, "Unwrapped", CALIB_NOWRAP)
+
+    print("\n" + "="*40)
+    print(f"GRAND TOTAL: {tot_w + tot_u}")
+    print("="*40)
+
