@@ -24,7 +24,7 @@ python3 -m venv ramco_env && source ramco_env/bin/activate
 pip install -r requirements.txt
 
 # run unified counter
-python scripts/sheet_counter_unified.py \
+python scripts/5_unified/sheet_counter_unified.py \
   --wrap-pptx  data/raw/"Sheet stack with stretch wrap.pptx" \
   --nowrap-pptx data/raw/"Sheet stack without stretch wrap.pptx" \
   --wrap-dir   data/raw/wrap_images \
