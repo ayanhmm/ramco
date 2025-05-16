@@ -2,78 +2,87 @@
 """
 sheet_counter_calibrated.py
 
-POC to count sheets using Sobel+Hough with calibrated thresholds
-and a linear correction learned from calibration_results.csv.
+Count sheets by simple CV line-detection, then apply a linear calibration
+(final = a·raw + b) per mode (“wrap” vs “nowrap”).
 """
-
-import cv2, numpy as np, glob, os
+import os
+import cv2
+import numpy as np
+import argparse
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.cluster import DBSCAN
+from tqdm import tqdm
 
-# --- CALIBRATION & POC PARAMETERS ---
-SOBEL_KSIZE    = 3
-HOUGH_THRESH   = 200      # from calibration
-MIN_LINE_GAP   = 15       # from calibration
-ANGLE_TOLERANCE= np.pi/180 * 5
-IMG_EXTS       = ('*.jpg','*.jpeg','*.png')
-
-# Load calibration table and fit linear correction
-cal_df = pd.read_csv("calibration_results.csv")
-reg    = LinearRegression().fit(cal_df[['pred_raw']], cal_df['gt_count'])
-SLOPE, INTERCEPT = reg.coef_[0], reg.intercept_
-
-def preprocess(path):
-    """Read image → Sobel on Y → Otsu binarization."""
-    img  = cv2.imread(path)
+def compute_raw_count(image_path):
+    img = cv2.imread(image_path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    sob  = cv2.Sobel(gray, cv2.CV_64F, dx=0, dy=1, ksize=SOBEL_KSIZE)
-    abs_sob = np.uint8(cv2.normalize(np.abs(sob), None, 0,255, cv2.NORM_MINMAX))
-    _, bw   = cv2.threshold(abs_sob, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    return bw
+    gray = cv2.convertScaleAbs(gray, alpha=1.25, beta=0)
 
-def raw_count(bw):
-    """Detect horizontal lines via Hough and cluster by y0."""
-    lines = cv2.HoughLines(bw,1,np.pi/180,HOUGH_THRESH)
-    if lines is None: return 0
-    y0s = [rho/(np.sin(theta)+1e-6)
-           for rho,theta in lines[:,0]
-           if abs(theta) < ANGLE_TOLERANCE or abs(theta-np.pi)<ANGLE_TOLERANCE]
-    if not y0s: return 0
-    y0s.sort()
-    clusters = [y0s[0]]
-    for y in y0s[1:]:
-        if abs(y-clusters[-1]) > MIN_LINE_GAP:
-            clusters.append(y)
-    return len(clusters)
+    sob = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    sob = np.uint8(np.abs(sob) / (np.abs(sob).max() + 1e-6) * 255)
+    edges = cv2.Canny(sob, 50, 150)
 
-def process_dir(label, directory):
-    print(f"\nProcessing {label} images in: {directory}")
-    total_raw = 0
-    total_cal = 0
-    paths = sorted(sum((glob.glob(os.path.join(directory, ext)) for ext in IMG_EXTS), []))
-    for p in paths:
-        bw  = preprocess(p)
-        r   = raw_count(bw)
-        c   = int(SLOPE * r + INTERCEPT)
-        total_raw += r
-        total_cal += c
-        print(f"  {os.path.basename(p):25} raw={r:3d} → cal={c:3d}")
-    print(f"Subtotal {label}: raw={total_raw:4d}, cal={total_cal:4d}")
-    return total_raw, total_cal
+    segs = cv2.HoughLinesP(edges, 1, np.pi/180,
+                           threshold=150, minLineLength=70, maxLineGap=8)
+    if segs is None:
+        return 0
+
+    mids = []
+    for x1, y1, x2, y2 in segs[:,0]:
+        angle = abs(np.degrees(np.arctan2(y2-y1, x2-x1)))
+        if angle < 2 or angle > 178:
+            mids.append([(y1 + y2) / 2.])
+    if not mids:
+        return 0
+
+    labels = DBSCAN(eps=5, min_samples=1).fit(np.vstack(mids)).labels_
+    return len(set(labels))
+
+def load_calibration(csv_path):
+    df = pd.read_csv(csv_path)
+    # normalize column names to mode,a,b
+    first3 = list(df.columns[:3])
+    if first3 != ['mode','a','b']:
+        df = df.rename(columns={
+            first3[0]: 'mode',
+            first3[1]: 'a',
+            first3[2]: 'b',
+        })
+    return {row['mode']: (float(row['a']), float(row['b']))
+            for _, row in df.iterrows()}
+
+def process_folder(folder, mode, ab):
+    a, b = ab
+    imgs = sorted(
+        f for f in os.listdir(folder)
+        if f.lower().endswith(('.jpg','.jpeg','.png'))
+    )
+    subtotal = 0
+    print(f"\n--- {mode.title()} ({len(imgs)} images) ---")
+    for fn in tqdm(imgs, desc=mode):
+        raw = compute_raw_count(os.path.join(folder, fn))
+        cal = int(round(a * raw + b))
+        print(f"{fn:25s} → raw={raw:3d}  cal={cal:3d}")
+        subtotal += cal
+    print(f"Subtotal {mode.title()}: {subtotal}")
+    return subtotal
 
 if __name__ == "__main__":
-    import argparse
-    p = argparse.ArgumentParser(__doc__)
-    p.add_argument("--wrap_dir",   required=True, help="Folder with wrapped images")
-    p.add_argument("--unwrap_dir", required=True, help="Folder with unwrapped images")
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--wrap_dir",    required=True, help="folder of wrapped images")
+    p.add_argument("--unwrap_dir",  required=True, help="folder of unwrapped images")
+    p.add_argument("--calibration", required=True,
+                   help="CSV file with columns [mode, a, b] per row")
     args = p.parse_args()
 
-    wr_raw, wr_cal = process_dir("Wrapped",   args.wrap_dir)
-    un_raw, un_cal = process_dir("Unwrapped", args.unwrap_dir)
+    calib = load_calibration(args.calibration)
+    wrap_ab   = calib.get('wrap',   (1.0, 0.0))
+    nowrap_ab = calib.get('nowrap', (1.0, 0.0))
+
+    tot_w = process_folder(args.wrap_dir,   'wrap',   wrap_ab)
+    tot_u = process_folder(args.unwrap_dir, 'nowrap', nowrap_ab)
 
     print("\n" + "="*40)
-    print(f"TOTAL WRAPPED : raw={wr_raw:4d}, cal={wr_cal:4d}")
-    print(f"TOTAL UNWRAPPED: raw={un_raw:4d}, cal={un_cal:4d}")
-    print(f"GRAND TOTAL    : raw={wr_raw+un_raw:4d}, cal={wr_cal+un_cal:4d}")
+    print(f"GRAND TOTAL: {tot_w + tot_u}")
     print("="*40)
 
