@@ -1,68 +1,119 @@
-## Quickstart
+Ramco Sheet-Counter
 
-1. **Create & activate your virtual environment**  
-   ```bash
-   python3 -m venv ramco_env
-   source ramco_env/bin/activate
-Install dependencies
+Automated pipeline for counting stacked fiber-cement sheets from photos.
 
-bash
-Copy
-Edit
+Repository Layout
+
+.
+├── data/
+│   ├── raw/
+│   │   ├── wrap_images/          ← your wrapped-image set
+│   │   ├── nowrap_images/        ← your unwrapped-image set
+│   │   ├── "Sheet stack with stretch wrap.pptx"
+│   │   ├── "Sheet stack without stretch wrap.pptx"
+│   │   └── calibration_results.csv (ground-truth a,b)
+│   └── extracted/                ← optional: extracted features, etc.
+├── models/                       ← trained RF pipelines (`*.pkl`)
+├── scripts/                      ← all runnable scripts
+│   ├── 1_cv/                     ← classic computer-vision scripts
+│   ├── 2_ml/                     ← CV+ML and calibration scripts
+│   ├── 3_multimodal/             ← BLIP/CLIP based experiments
+│   └── sheet_counter_unified.py  ← unified hybrid entry point
+├── notebooks/                    ← exploration & EDA
+└── docs/
+    ├── usage.md                  ← this file
+    └── testing.md                ← how to run smoke tests
+
+Quickstart
+
+# 1. Create & activate virtualenv
+python3 -m venv ramco_env
+source ramco_env/bin/activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
-Run the unified counter
 
-bash
-Copy
-Edit
-python scripts/5_unified/sheet_counter_unified.py \
+# 3. Unified counter (parses PPT titles + fallback CV+RF)
+python scripts/sheet_counter_unified.py \
   --wrap-pptx  data/raw/"Sheet stack with stretch wrap.pptx" \
   --nowrap-pptx data/raw/"Sheet stack without stretch wrap.pptx" \
   --wrap-dir   data/raw/wrap_images \
-  --nowrap-dir data/raw/nowrap_images
-This will:
+  --nowrap-dir data/raw/nowrap_images \
+  --calibration data/raw/calibration_results.csv
 
-Parse exact counts from any slide titles when available
+Smoke-Test Suite
 
-Fall back to a trained regression model on CV features for “raw” photos
+We include a small set of shell scripts under scripts/utils/tests/ to verify each pivot:
 
-| Script                                            | Intent / Pivot Description                                                                 |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `scripts/1_cv/sheet_counter_poc.py`                    | **Proof-of-concept CV**: simple edge-based line counting; undercounts in complex scenes.   |
-| `scripts/1_cv/sheet_counter_ridges.py`                 | **Alternate CV**: ridge detection to capture edges; still noisy in real images.            |
-| `scripts/2_calibration/full_calibration.py`                     | **Linear Calibration**: apply analytic bias correction (`final = a·raw + b`).              |
-| `scripts/2_calibration/full_calibration_dbscan.py`              | **DBSCAN Clustering**: cluster detected line midpoints to group per-sheet detections.      |
-| `scripts/2_calibration/calibrate_counts.py`                     | **Calibration Utility**: interactive fitting of `(a, b)` against PPT ground truth.         |
-| `scripts/utils/list_slides_and_captions.py`             | **Slide Metadata Extraction**: map PPT slides → image filenames & extract title text.      |
-| `scripts/4_multimodal/generate_captions.py`                    | **BLIP Captioning**: auto-annotate images to bootstrap multimodal features.                |
-| `scripts/3_ml/train_feature_regressors.py`             | **RF on CV Features**: train RandomForest on `[raw_count, length, edges, layers]`.         |
-| `scripts/3_ml/sheet_counter_ml.py`                     | **Inference CV-ML**: apply the CV-trained RF models to new images.                         |
-| `scripts/4_multimodal/train_multimodal.py`                     | **Multimodal (BLIP+CLIP)**: combine BLIP captions + CLIP embeddings for regression.        |
-| `scripts/4_multimodal/train_multimodal_cached.py`              | **Cached Features**: extract & cache BLIP/CLIP embeddings to speed up iterations.          |
-| `scripts/4_multimodal/train_multimodal_pca.py`                 | **PCA on CLIP**: reduce 512-dim embeddings to top components (limited by sample size).     |
-| `scripts/4_multimodal/train_multimodal_pca_with_layers.py`     | **Add Layer Count**: include vertical-Hough sheet layers into multimodal PCA pipeline.     |
-| `scripts/4_multimodal/sheet_counter_multimodal.py`             | **Inference Multimodal**: run the best multimodal RF model on new images.                  |
-| `scripts/4_multimodal/sheet_counter_multimodal_with_layers.py` | **Inference + Layers**: include layer count in inference.                                  |
-| `scripts/3_ml/retrain_cv_only_models.py`               | **Retrain CV-only RF**: rebuild RF models on CV features using latest ground truth splits. |
-| `scripts/5_unified/sheet_counter_unified.py`                | **Unified Hybrid**: parse exact PPT counts when available; else fallback to CV+RF(+cal).   |
+1_cv/smoke_test_1_cv.shRuns:
 
+sheet_counter_poc.py
 
-Evolution Roadmap
+sheet_counter_ridges.py
 
-Primitive CV → undercounts due to occlusions and noise
+sheet_counter_calibrated.py
 
-Ridge & DBSCAN → better grouping but still high variance
+2_ml/smoke_test_2_ml.shRuns your CV+ML and multimodal inference scripts.
 
-Linear Calibration → reduce systematic bias (a·raw + b)
+…and so on.
 
-Random Forest on CV features → major MSE reduction
+Running the CV smoke tests
 
-Multimodal (BLIP+CLIP) → marginal gains from text embeddings
+# from project root
+bash scripts/utils/tests/smoke_test_1_cv.sh
 
-Dimensionality Reduction (PCA) → limited by sample size
+It will look under data/raw/wrap_images and data/raw/nowrap_images.You should see console ✅ passes or detailed errors.
 
-Layer Count Feature → captures vertical stacks; risk of overfitting
+Script Catalog & Intent
 
-Unified Hybrid → combine exact parsing + robust ML fallback
+Script
+
+Intent / Pivot
+
+scripts/1_cv/sheet_counter_poc.py
+
+POC CV: simple edge-counting; undercounts in complex scenes
+
+scripts/1_cv/sheet_counter_ridges.py
+
+Ridge detection + Hough; still noisy
+
+scripts/1_cv/sheet_counter_calibrated.py
+
+CV + per-mode linear calibration (final = a·raw + b)
+
+scripts/2_ml/train_feature_regressors.py
+
+RF on CV features: [raw, length, edges, layers]
+
+scripts/2_ml/sheet_counter_ml.py
+
+Inference CV+RF
+
+scripts/2_ml/retrain_cv_only_models.py
+
+Retrain RF on updated GT
+
+scripts/3_multimodal/train_multimodal.py
+
+BLIP+CLIP multimodal regressor
+
+scripts/3_multimodal/sheet_counter_multimodal.py
+
+Inference multimodal
+
+scripts/sheet_counter_unified.py
+
+Hybrid: exact PPT parse → CV+RF fallback with calibration
+
+Next Steps & Testing
+
+Add smoke tests under scripts/utils/tests/ for each layer (ML, multimodal, unified).
+
+Validate on your CI by invoking those scripts on a subset of data/raw/.
+
+Document any new script arguments or dependencies back in this guide.
+
+Happy counting!
 
 
