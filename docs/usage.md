@@ -2,130 +2,93 @@
 
 Automated pipeline for counting stacked fiber-cement sheets from photos.
 
----
-
 ## Repository Layout
 
+```
 .
 ├── data/
-│ ├── raw/
-│ │ ├── wrap_images/ ← your wrapped-image set
-│ │ ├── nowrap_images/ ← your unwrapped-image set
-│ │ ├── "Sheet stack with stretch wrap.pptx"
-│ │ ├── "Sheet stack without stretch wrap.pptx"
-│ │ └── calibration_results.csv ← ground-truth calibration parameters
-│ └── extracted/ ← optional: extracted features, etc.
-├── models/ ← trained RF pipelines (*.pkl)
-├── scripts/ ← all runnable scripts
-│ ├── 1_cv/ ← classic computer-vision scripts
-│ ├── 2_ml/ ← CV+ML and calibration scripts
-│ ├── 3_multimodal/ ← BLIP/CLIP based experiments
-│ └── sheet_counter_unified.py ← unified hybrid entry point
-├── notebooks/ ← exploration & EDA
+│   ├── raw/
+│   │   ├── wrap_images/       ← your wrapped-image set
+│   │   ├── nowrap_images/     ← your unwrapped-image set
+│   │   ├── "Sheet stack with stretch wrap.pptx"
+│   │   ├── "Sheet stack without stretch wrap.pptx"
+│   │   ├── captions.json
+│   │   └── calibration_results.csv (ground-truth a,b)
+│   └── extracted/             ← optional: extracted features, etc.
+├── models/                    ← trained RF pipelines (*.pkl)
+├── scripts/                   ← all runnable scripts
+│   ├── 1_cv/                  ← classic computer-vision scripts
+│   ├── 2_ml/                  ← CV+ML and calibration scripts
+│   ├── 3_multimodal/          ← BLIP/CLIP based experiments
+│   └── sheet_counter_unified.py ← unified hybrid entry point
+├── notebooks/                 ← exploration & EDA
 └── docs/
-├── usage.md ← this file
-└── testing.md ← how to run smoke tests
-
-yaml
-Copy
-Edit
-
----
+    ├── usage.md               ← this file
+    └── testing.md             ← how to run smoke tests
+```
 
 ## Quickstart
 
-1. **Create & activate your virtualenv**  
-   ```bash
-   python3 -m venv ramco_env
-   source ramco_env/bin/activate
-Install dependencies
+```bash
+# 1. Create & activate your virtualenv
+python3 -m venv ramco_env
+source ramco_env/bin/activate
 
-bash
-Copy
-Edit
+# 2. Install dependencies
 pip install -r requirements.txt
-Run the unified counter
 
-bash
-Copy
-Edit
-python scripts/sheet_counter_unified.py \
-  --wrap-pptx  data/raw/"Sheet stack with stretch wrap.pptx" \
-  --nowrap-pptx data/raw/"Sheet stack without stretch wrap.pptx" \
-  --wrap-dir   data/raw/wrap_images \
-  --nowrap-dir data/raw/nowrap_images \
-  --calibration data/raw/calibration_results.csv
-Parses exact counts from any slide titles in your PPTs
+# 3. Unified counter (parses PPT titles + fallback CV+RF)
+python scripts/sheet_counter_unified.py   --wrap-pptx  data/raw/"Sheet stack with stretch wrap.pptx"   --nowrap-pptx data/raw/"Sheet stack without stretch wrap.pptx"   --wrap-dir   data/raw/wrap_images   --nowrap-dir data/raw/nowrap_images   --calibration data/raw/calibration_results.csv
+```
 
-Falls back to a calibrated CV + RF model on raw images
+---
 
-Smoke-Test Suite
-We include shell scripts under scripts/utils/tests/ to verify each pivot layer:
+## Smoke-Test Suite
 
-1. CV smoke tests
-bash
-Copy
-Edit
+We include shell scripts under `scripts/utils/tests/` to verify each pivot:
+
+- `1_cv/smoke_test_1_cv.sh`  
+  Runs:
+  - `sheet_counter_poc.py`
+  - `sheet_counter_ridges.py`
+  - `sheet_counter_calibrated.py`
+
+- `2_ml/smoke_test_2_ml.sh`  
+  Runs CV+ML & calibration scripts.
+
+- `3_multimodal/smoke_test_3_mm.sh`  
+  Runs multimodal experiments.
+
+### Running the CV smoke tests
+
+```bash
+# from project root
 bash scripts/utils/tests/smoke_test_1_cv.sh
-Runs:
+```
 
-1_cv/sheet_counter_poc.py
+It will look under `data/raw/wrap_images` and `data/raw/nowrap_images` and report ✅ if all pass (otherwise tracebacks).
 
-1_cv/sheet_counter_ridges.py
+---
 
-1_cv/sheet_counter_calibrated.py
+## Script Catalog & Intent
 
-2. ML smoke tests
-bash
-Copy
-Edit
-bash scripts/utils/tests/smoke_test_2_ml.sh
-Runs:
+| Script                                                           | Intent / Pivot                                                   |
+|------------------------------------------------------------------|------------------------------------------------------------------|
+| `scripts/1_cv/sheet_counter_poc.py`                              | POC CV: simple edge‑based counting; undercounts in complex scenes. |
+| `scripts/1_cv/sheet_counter_ridges.py`                           | Ridge detection + Hough; still noisy.                            |
+| `scripts/1_cv/sheet_counter_calibrated.py`                       | CV + per-mode linear calibration (final = a·raw + b).           |
+| `scripts/2_ml/train_feature_regressors.py`                       | RF on CV features: [raw_count, length, edges, layers].           |
+| `scripts/2_ml/sheet_counter_ml.py`                               | Inference CV+RF.                                                |
+| `scripts/2_ml/retrain_cv_only_models.py`                         | Retrain RF on updated ground truth.                             |
+| `scripts/3_multimodal/train_multimodal.py`                       | BLIP+CLIP multimodal regressor.                                 |
+| `scripts/3_multimodal/sheet_counter_multimodal.py`               | Multimodal inference.                                           |
+| `scripts/sheet_counter_unified.py`                               | Unified hybrid: exact PPT parse → CV+RF fallback with calibration. |
 
-2_ml/train_feature_regressors.py
+---
 
-2_ml/sheet_counter_ml.py
+## Next Steps & Testing
 
-2_ml/retrain_cv_only_models.py
-
-3. Multimodal smoke tests
-bash
-Copy
-Edit
-bash scripts/utils/tests/smoke_test_3_multimodal.sh
-Runs:
-
-3_multimodal/train_multimodal.py
-
-3_multimodal/sheet_counter_multimodal.py
-
-Script Catalog & Intent
-Script	Intent / Pivot
-scripts/1_cv/sheet_counter_poc.py	POC CV: simple edge-based line counting; undercounts in scenes
-scripts/1_cv/sheet_counter_ridges.py	Ridge detection + Hough; still noisy
-scripts/1_cv/sheet_counter_calibrated.py	CV + per-mode linear calibration (final = a·raw + b)
-scripts/2_ml/train_feature_regressors.py	RF on CV features: [raw_count, length, edges, layers]
-scripts/2_ml/sheet_counter_ml.py	Inference: apply CV-trained RF to new images
-scripts/2_ml/retrain_cv_only_models.py	Retrain CV-only RF on updated ground truth
-scripts/3_multimodal/train_multimodal.py	BLIP+CLIP multimodal regressor
-scripts/3_multimodal/sheet_counter_multimodal.py	Inference using multimodal RF models
-scripts/sheet_counter_unified.py	Unified Hybrid: exact PPT parse → CV+RF fallback with calibration
-
-Evolution Roadmap
-Primitive CV → under-counts due to occlusions & noise
-
-Ridge & DBSCAN → better grouping but still high variance
-
-Linear Calibration → corrects systematic bias (a·raw + b)
-
-Random Forest (CV features) → major MSE reduction
-
-Multimodal (BLIP+CLIP) → marginal gains; embeddings too coarse
-
-Dimensionality Reduction (PCA) → limited by sample size
-
-Layer-count feature → captures vertical stacks; risk of over-fitting
-
-Unified Hybrid → combines exact PPT parsing + robust ML fallback
-
+- Add smoke-test scripts under `scripts/utils/tests/` for ML, multimodal, and unified layers.
+- Validate on CI by invoking these on a small subset of `data/raw/`.
+- Update this guide with any new script arguments or dependencies.
 
