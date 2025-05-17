@@ -70,6 +70,15 @@ It will look under `data/raw/wrap_images` and `data/raw/nowrap_images` and repor
 
 ---
 
+## Docker Smoke Test
+
+We provide Docker artifacts to simplify setup:
+
+```bash
+# Builds the image and runs the smoke test on Unix (macOS, Linux, WSL, Git Bash)
+./docker_smoke_test.sh
+
+
 ## Script Catalog & Intent
 
 | Script                                                           | Intent / Pivot                                                   |
