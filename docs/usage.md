@@ -79,7 +79,7 @@ We provide Docker artifacts to simplify setup:
 ./docker_smoke_test.sh
 
 
-Or you could also run get into the container and run the smoke test. 
+## Docker Smoke Test within the container
 
 ```bash
 docker run --rm -it ramco bash
