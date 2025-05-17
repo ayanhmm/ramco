@@ -78,10 +78,7 @@ We provide Docker artifacts to simplify setup:
 # Builds the image and runs the smoke test on Unix (macOS, Linux, WSL, Git Bash)
 ./docker_smoke_test.sh
 
-
-## Docker Smoke Test within the container
-
-```bash
+# Docker Smoke Test within the container
 docker run --rm -it ramco bash
 ./scripts/utils/tests/smoke_test_1_cv.sh
 
