@@ -7,8 +7,15 @@ __pycache__/
 # Virtual environment
 ramco_env/
 
-# Models: track .pkl files, ignore any new artifacts
-models/
+# ─── models: ignore all new artifacts, except .pkl ─────────────────
+
+# ignore everything under models/
+models/*
+
+# but do not ignore the directory itself
+!models/
+
+# and do not ignore any .pkl in it
 !models/*.pkl
 
 # Data
