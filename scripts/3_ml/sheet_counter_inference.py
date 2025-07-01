@@ -9,8 +9,10 @@ import os, glob, pickle, cv2, numpy as np
 import pandas as pd
 
 # ─── EDIT THESE PATHS ──────────────────────────────────────────────────────────
-RF_WRAPPED_PKL   = "rf_wrapped.pkl"
-RF_UNWRAPPED_PKL = "rf_unwrapped.pkl"
+# RF_WRAPPED_PKL   = "rf_wrapped.pkl"
+# RF_UNWRAPPED_PKL = "rf_unwrapped.pkl"
+RF_WRAPPED_PKL   = "rf_wrapped_multi.pkl"
+RF_UNWRAPPED_PKL = "rf_unwrapped_multi.pkl"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Preprocessing & feature extraction (same as training)
@@ -68,12 +70,18 @@ if __name__=="__main__":
     print("\nUnwrapped Counts:")
     for fn, cnt in process_folder(rf_unwrap, args.unwrap_dir):
         print(f"  {fn:25s} → {cnt}")  
-    ```
+#     ```
 
-**Run inference** on any image sets:
+# **Run inference** on any image sets:
 
-```bash
-python sheet_counter_inference.py \
-  --wrap_dir ramco_images/wrap_images \
-  --unwrap_dir ramco_images/nowrap_images
+# ```bash
+# python sheet_counter_inference.py \
+#   --wrap_dir ramco_images/wrap_images \
+#   --unwrap_dir ramco_images/nowrap_images
+
+'''
+python scripts/3_ml/sheet_counter_inference.py \
+    --wrap_dir   data/raw/wrap_images \
+    --unwrap_dir data/raw/nowrap_images
+'''
 

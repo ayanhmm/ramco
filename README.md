@@ -25,10 +25,10 @@ pip install -r requirements.txt
 
 # run unified counter
 python scripts/5_unified/sheet_counter_unified.py \
-  --wrap-pptx  data/raw/"Sheet stack with stretch wrap.pptx" \
-  --nowrap-pptx data/raw/"Sheet stack without stretch wrap.pptx" \
-  --wrap-dir   data/raw/wrap_images \
-  --nowrap-dir data/raw/nowrap_images
+  --wrap_pptx  ramco_images/"Sheet stack with stretch wrap.pptx" \
+  --nowrap_pptx ramco_images/"Sheet stack without stretch wrap.pptx" \
+  --wrap_dir   data/raw/wrap_images \
+  --nowrap_dir data/raw/nowrap_images
 ```
 
 See docs/usage.md for full details.

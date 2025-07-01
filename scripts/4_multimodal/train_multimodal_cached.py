@@ -27,11 +27,11 @@ from sklearn.preprocessing import StandardScaler
 from transformers import CLIPProcessor, CLIPModel
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-CAP_JSON   = "captions.json"
-WRAP_PPTX  = "ramco_images/Sheet stack with stretch wrap.pptx"
-NOWRAP_PPTX= "ramco_images/Sheet stack without stretch wrap.pptx"
-WRAP_DIR   = "ramco_images/wrap_images"
-NOWRAP_DIR = "ramco_images/nowrap_images"
+CAP_JSON         = "data/previews/captions.json"
+WRAP_PPTX     = "data/ramco_images/Sheet stack with stretch wrap.pptx"
+NOWRAP_PPTX   = "data/ramco_images/Sheet stack without stretch wrap.pptx"
+WRAP_DIR      = "data/raw/wrap_images"
+NOWRAP_DIR    = "data/raw/nowrap_images"
 IMAGE_EXTS = ("jpg","jpeg","png")
 # ────────────────────────────────────────────────────────────────────────────────
 
@@ -122,3 +122,6 @@ if __name__=="__main__":
     rowsn = extract_features(dfn, "Unwrapped")
     train(rowsn, "unwrapped")
 
+'''
+python scripts/4_multimodal/train_multimodal_cached.py 
+'''

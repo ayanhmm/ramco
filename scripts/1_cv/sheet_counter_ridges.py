@@ -22,6 +22,10 @@ def preprocess(path):
     abs_sob = np.uint8(cv2.normalize(np.absolute(sob), None, 0,255, cv2.NORM_MINMAX))
     # Otsu threshold
     _, bw = cv2.threshold(abs_sob, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    output_path="data/previews/1_sheet_counter_ridges"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = os.path.join(output_path, f"preprocessed.jpg")
+    cv2.imwrite(output_path, bw)
     return bw
 
 def count_sheets_via_hough(bw):
@@ -65,10 +69,17 @@ if __name__=="__main__":
     import argparse
     p = argparse.ArgumentParser(__doc__)
     p.add_argument("--wrap_dir",   required=True)
-    p.add_argument("--unwrap_dir", required=True)
+    p.add_argument("--nowrap_dir", required=True)
     args = p.parse_args()
 
-    w = process_dir("Wrapped",   args.wrap_dir)
-    u = process_dir("Unwrapped", args.unwrap_dir)
+    w = 0
+    # w = process_dir("Wrapped",   args.wrap_dir)
+    u = process_dir("Unwrapped", args.nowrap_dir)
     print("\nGRAND TOTAL:", w+u)
 
+
+'''
+python scripts/1_cv/sheet_counter_ridges.py \
+    --wrap_dir   data/raw/wrap_images \
+    --nowrap_dir data/raw/nowrap_images 
+'''

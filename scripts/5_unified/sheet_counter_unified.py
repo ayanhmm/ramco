@@ -15,8 +15,8 @@ from sklearn.cluster import DBSCAN
 from transformers import CLIPProcessor, CLIPModel
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-RF_WRAP_BUNDLE   = "rf_wrapped_multi_pca_layers.pkl"
-RF_NOWRAP_BUNDLE = "rf_unwrapped_multi_pca_layers.pkl"
+RF_WRAP_BUNDLE   = "./models/rf_wrapped_multi_pca_layers.pkl"
+RF_NOWRAP_BUNDLE = "./models/rf_unwrapped_multi_pca_layers.pkl"
 CLIP_MODEL_NAME  = "openai/clip-vit-base-patch32"
 # ───────────────────────────────────────────────────────────────────────────────
 
@@ -35,23 +35,38 @@ def load_title_texts(pptx_path, img_dir):
     """Map image filename → slide title text."""
     texts = {}
     if pptx_path and os.path.exists(pptx_path):
+        # print(f"Loading titles from {pptx_path}...")
         prs    = Presentation(pptx_path)
         slides = list(prs.slides)[1:]
+        # print(f"Found {len(slides)} slides in {pptx_path}.")
+        
         for i, slide in enumerate(slides, start=2):
+            # print(f"Processing slide {i}...")
             ts = getattr(slide.shapes, "title", None)
+            # print(f"  Title shape: {ts}")
             if not ts or not ts.has_text_frame:
                 ts = next((s for s in slide.shapes if getattr(s,"has_text_frame",False)), None)
             txt = ts.text.strip() if ts else ""
             idx = i - 1
+            # print(f"  Slide title: '{i}' '{txt}'")
+            
+            # fn = f"image{idx}.jpg"
+            # texts[fn] = txt
+            
+            
             for ext in ("jpg","jpeg","png"):
                 fn = f"image{idx}.{ext}"
-                if os.path.exists(os.path.join(img_dir, fn)):
+                fn2= os.path.join(img_dir, fn)
+                # print(f"  Checking for image: {fn2}")
+                if os.path.exists(fn2):
                     texts[fn] = txt
                     break
+    # print(texts)
     return texts
 
 def extract_features(path, title_map):
     """Compute CV feats + CLIP-text-PCA feats; return combined feature vector."""
+    print(path)
     img = cv2.imread(path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.convertScaleAbs(gray, alpha=1.25, beta=0)
@@ -94,8 +109,11 @@ def extract_features(path, title_map):
 
     # ── CLIP text → embed → PCA
     fn = os.path.basename(path)
+    # print(fn)
     txt = title_map.get(fn, "")
+    print(f"Extracting features for {fn} with title '{txt}'")
     inputs = clip_proc(text=[txt], return_tensors="pt", padding=True)
+    # print(inputs)
     with torch.no_grad():
         text_emb = clip_model.get_text_features(**inputs)[0].cpu().numpy()
 
@@ -109,14 +127,20 @@ def extract_features(path, title_map):
     return np.hstack([cv_feats, text_pca])
 
 def process(folder, title_map, bundle, label):
-    pca, model = bundle["pca"], bundle["model"]
+    pca = bundle["pca"]
+    model = bundle["model"]
+
     imgs = sorted(glob.glob(os.path.join(folder,"*.jpg")) +
-                  glob.glob(os.path.join(folder,"*.jpeg")) +
-                  glob.glob(os.path.join(folder,"*.png")))
+                glob.glob(os.path.join(folder,"*.jpeg")) +
+                glob.glob(os.path.join(folder,"*.png")))
+    # print(imgs)
     subtotal = 0
     print(f"\n--- {label} ({len(imgs)} images) ---")
+    
+    
     for p in tqdm(imgs, desc=label):
         feat = extract_features(p, title_map)
+        # print(feat)
         cnt  = int(round(model.predict([feat])[0]))
         subtotal += cnt
         print(f"{os.path.basename(p):25s} → {cnt:3d}")
@@ -126,19 +150,34 @@ def process(folder, title_map, bundle, label):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("--wrap_pptx",   required=False, help="PPTX for wrapped titles")
-    parser.add_argument("--nowrap_pptx", required=False, help="PPTX for unwrapped titles")
+    parser.add_argument("--wrap_pptx",   required=True, help="PPTX for wrapped titles")
+    parser.add_argument("--nowrap_pptx", required=True, help="PPTX for unwrapped titles")
     parser.add_argument("--wrap_dir",    required=True,  help="Folder of wrapped images")
     parser.add_argument("--nowrap_dir",  required=True,  help="Folder of unwrapped images")
     args = parser.parse_args()
 
-    wrap_titles   = load_title_texts(args.wrap_pptx,   args.wrap_dir)
+    nowrap_titles = []
+    wrap_titles = []
+    # wrap_titles   = load_title_texts(args.wrap_pptx,   args.wrap_dir)
     nowrap_titles = load_title_texts(args.nowrap_pptx, args.nowrap_dir)
+    print(nowrap_titles)
+    
+    print(f"Loaded {len(wrap_titles)} wrapped titles and {len(nowrap_titles)} unwrapped titles.")
 
-    tot_w = process(args.wrap_dir,   wrap_titles,   wrap_bundle,   "Wrapped")
+    tot_u = 0  
+    tot_w = 0
+    # tot_w = process(args.wrap_dir,   wrap_titles,   wrap_bundle,   "Wrapped")
     tot_u = process(args.nowrap_dir, nowrap_titles, nowrap_bundle, "Unwrapped")
+    
 
     print("\n" + "="*40)
     print(f"GRAND TOTAL: {tot_w + tot_u}")
     print("="*40)
 
+'''
+python scripts/5_unified/sheet_counter_unified.py \
+    --wrap_pptx  data/ramco_images/"Sheet stack with stretch wrap.pptx" \
+    --nowrap_pptx data/ramco_images/"Sheet stack without stretch wrap.pptx" \
+    --wrap_dir   data/raw/wrap_images \
+    --nowrap_dir data/raw/nowrap_images
+'''

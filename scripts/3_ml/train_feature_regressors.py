@@ -22,10 +22,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
 # ─── UPDATE THESE PATHS ─────────────────────────────────────────────────────────
-WRAP_PPTX = "ramco_images/Sheet stack with stretch wrap.pptx"
-NOWRAP_PPTX = "ramco_images/Sheet stack without stretch wrap.pptx"
-WRAP_DIR = "ramco_images/wrap_images"
-NOWRAP_DIR = "ramco_images/nowrap_images"
+# Paths to PPTX and image directories
+WRAP_PPTX     = "data/ramco_images/Sheet stack with stretch wrap.pptx"
+NOWRAP_PPTX   = "data/ramco_images/Sheet stack without stretch wrap.pptx"
+WRAP_DIR      = "data/raw/wrap_images"
+NOWRAP_DIR    = "data/raw/nowrap_images"
 # ────────────────────────────────────────────────────────────────────────────────
 
 IMAGE_EXTS = ("jpg","jpeg","png")
@@ -99,7 +100,7 @@ def train_and_save(df, name):
                            scoring="neg_mean_squared_error").mean()
     print(f"{name} CV MSE: {mse:.1f}")
     pipeline.fit(X, y)
-    with open(f"rf_{name}.pkl", "wb") as f:
+    with open(f"models/rf_{name}.pkl", "wb") as f:
         pickle.dump(pipeline, f)
     df["pred"] = pipeline.predict(X)
     print(f"\n{name} predictions vs. GT:\n", df[["gt","pred"]])
@@ -116,3 +117,6 @@ if __name__ == "__main__":
     train_and_save(feat_wrap, "wrapped")
     train_and_save(feat_nowrap, "unwrapped")
 
+'''
+python scripts/3_ml/train_feature_regressors.py 
+'''

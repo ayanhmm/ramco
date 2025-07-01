@@ -16,11 +16,11 @@ from pptx import Presentation
 from sklearn.linear_model import LinearRegression
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ─── UPDATE THESE PATHS TO YOUR ENVIRONMENT ───────────────────────────────────
-WRAP_PPTX    = "ramco_images/Sheet stack with stretch wrap.pptx"
-UNWRAP_PPTX  = "ramco_images/Sheet stack without stretch wrap.pptx"
-WRAP_DIR     = "ramco_images/wrap_images"
-UNWRAP_DIR   = "ramco_images/nowrap_images"
+# Paths to PPTX and image directories
+WRAP_PPTX     = "data/ramco_images/Sheet stack with stretch wrap.pptx"
+UNWRAP_PPTX   = "data/ramco_images/Sheet stack without stretch wrap.pptx"
+WRAP_DIR      = "data/raw/wrap_images"
+UNWRAP_DIR    = "data/raw/nowrap_images"
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Initial Hough parameters (we’ll grid-search around these)
@@ -142,3 +142,6 @@ def main():
 if __name__=="__main__":
     main()
 
+'''
+python scripts/2_calibration/full_calibration.py 
+'''

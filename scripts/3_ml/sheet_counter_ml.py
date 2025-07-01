@@ -14,8 +14,10 @@ import argparse
 from sklearn.cluster import DBSCAN
 
 # ─── PATHS TO YOUR TRAINED MODELS ───────────────────────────────────────────────
-RF_WRAPPED_PKL   = "rf_wrapped.pkl"
-RF_UNWRAPPED_PKL = "rf_unwrapped.pkl"
+# RF_WRAPPED_PKL   = "rf_wrapped.pkl"
+# RF_UNWRAPPED_PKL = "rf_unwrapped.pkl"
+RF_WRAPPED_PKL   = "rf_wrapped_multi.pkl"
+RF_UNWRAPPED_PKL = "rf_unwrapped_multi.pkl"
 # ────────────────────────────────────────────────────────────────────────────────
 
 # Preprocessing & feature‐extraction constants (same as training)
@@ -95,3 +97,9 @@ if __name__ == "__main__":
     print(f"GRAND TOTAL: {tot_wrap + tot_unwrap}")
     print("="*40)
 
+
+'''
+python scripts/3_ml/sheet_counter_ml.py \
+    --wrap_dir   data/raw/wrap_images \
+    --unwrap_dir data/raw/nowrap_images
+'''

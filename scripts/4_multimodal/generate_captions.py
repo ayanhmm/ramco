@@ -12,9 +12,9 @@ import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
 # ─── CONFIG ───────────────────────────────────────────────
-WRAP_DIR = "ramco_images/wrap_images"
-NOWRAP_DIR = "ramco_images/nowrap_images"
-OUT_JSON    = "captions.json"
+WRAP_DIR      = "data/raw/wrap_images"
+NOWRAP_DIR    = "data/raw/nowrap_images"
+OUT_JSON    = "data/previews/captions.json"
 IMAGE_EXTS  = (".jpg", ".jpeg", ".png")
 # ──────────────────────────────────────────────────────────
 
@@ -45,3 +45,7 @@ if __name__=="__main__":
         json.dump(captions, f, indent=2)
     print(f"Saved {len(captions)} captions to {OUT_JSON}")
 
+
+'''
+python scripts/4_multimodal/generate_captions.py 
+'''

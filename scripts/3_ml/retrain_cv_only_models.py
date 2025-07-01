@@ -15,10 +15,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
-WRAP_PPTX      = "ramco_images/Sheet stack with stretch wrap.pptx"
-NOWRAP_PPTX    = "ramco_images/Sheet stack without stretch wrap.pptx"
-WRAP_DIR       = "ramco_images/wrap_images"
-NOWRAP_DIR     = "ramco_images/nowrap_images"
+# Paths to PPTX and image directories
+WRAP_PPTX     = "data/ramco_images/Sheet stack with stretch wrap.pptx"
+NOWRAP_PPTX   = "data/ramco_images/Sheet stack without stretch wrap.pptx"
+WRAP_DIR      = "data/raw/wrap_images"
+NOWRAP_DIR    = "data/raw/nowrap_images"
 OUT_WRAP_PKL   = "rf_wrapped_multi.pkl"
 OUT_NOWRAP_PKL = "rf_unwrapped_multi.pkl"
 RE_BUNDLES     = re.compile(r"(\d+)[×xX*]\s*(\d+)")
@@ -121,6 +122,9 @@ def train_and_save(df, out_pkl, label):
         ("scale", StandardScaler()),
         ("rf", RandomForestRegressor(n_estimators=100, random_state=42))
     ])
+    # --------------------RandomForestRegressor--------------------
+    #   n_estimators=100,
+    #   criterion='squared_error',
     pipe.fit(X, y)
     mse = ((pipe.predict(X) - y)**2).mean()
     print(f"{label}: Trained on {len(df)} samples; MSE = {mse:.1f}")
@@ -149,4 +153,6 @@ if __name__ == "__main__":
 
 
 
-
+'''
+python scripts/3_ml/retrain_cv_only_models.py 
+'''

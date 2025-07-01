@@ -23,10 +23,10 @@ from transformers import BlipProcessor, BlipForConditionalGeneration
 from transformers import CLIPProcessor, CLIPModel
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
-WRAP_PPTX    = "ramco_images/Sheet stack with stretch wrap.pptx"
-NOWRAP_PPTX  = "ramco_images/Sheet stack without stretch wrap.pptx"
-WRAP_DIR = "ramco_images/wrap_images"
-NOWRAP_DIR = "ramco_images/nowrap_images"
+WRAP_PPTX     = "data/ramco_images/Sheet stack with stretch wrap.pptx"
+NOWRAP_PPTX   = "data/ramco_images/Sheet stack without stretch wrap.pptx"
+WRAP_DIR      = "data/raw/wrap_images"
+NOWRAP_DIR    = "data/raw/nowrap_images"
 IMAGE_EXTS   = ("jpg","jpeg","png")
 # ────────────────────────────────────────────────────────────────────────────────
 
@@ -136,3 +136,6 @@ if __name__ == "__main__":
     rows_n = extract_features_and_text(df_nowrap, "Unwrapped")
     train_multimodal(rows_n, "unwrapped")
 
+'''
+python scripts/4_multimodal/train_multimodal.py 
+'''

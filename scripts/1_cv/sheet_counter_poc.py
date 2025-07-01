@@ -22,18 +22,41 @@ def preprocess(img):
     gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     eq    = clahe.apply(gray)
-    return cv2.GaussianBlur(eq, (5,5), 0)
+    output_path="data/previews/1_sheet_counter_poc"
+    yo = cv2.GaussianBlur(eq, (5,5), 0)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = os.path.join(output_path, f"preprocessed.jpg")
+    cv2.imwrite(output_path, yo)
+    return yo
 
-def count_sheets(img):
-    edges   = cv2.Canny(img, CANNY_THRESH1, CANNY_THRESH2)
-    kernel  = cv2.getStructuringElement(cv2.MORPH_RECT,
-                                        (MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE))
-    closed  = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
-    contours, _ = cv2.findContours(closed,
-                                   cv2.RETR_EXTERNAL,
-                                   cv2.CHAIN_APPROX_SIMPLE)
-    # filter out small artifacts
+def count_sheets(img, output_path="data/previews/1_sheet_counter_poc"):
+    # Step 1: Edge detection
+    edges = cv2.Canny(img, CANNY_THRESH1, CANNY_THRESH2)
+
+    # Step 2: Morphological closing to close gaps in edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE))
+    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    # Step 3: Find external contours
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Step 4: Filter out small noise
     sheets = [c for c in contours if cv2.contourArea(c) > MIN_CONTOUR_AREA]
+
+    # Visualization
+    vis = img.copy()
+    cv2.drawContours(vis, sheets, -1, (0, 255, 0), 5)
+
+    if output_path:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        output_path = os.path.join(output_path, f"hline_clusters.jpg")
+        cv2.imwrite(output_path, vis)
+    else:
+        # Optional: show in a window (good for debugging)
+        cv2.imshow("Detected Sheets", vis)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
     return len(sheets)
 
 def process_dir(name, directory):
@@ -69,15 +92,18 @@ def process_dir(name, directory):
 # --- MAIN POC ---
 if __name__ == "__main__":
     import argparse
-    p = argparse.ArgumentParser(__doc__)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--wrap_dir",   required=True,
                    help="Folder containing *wrapped* stock-yard images")
-    p.add_argument("--unwrap_dir", required=True,
+    p.add_argument("--nowrap_dir", required=True,
                    help="Folder containing *unwrapped* stock-yard images")
     args = p.parse_args()
+    print(args)
 
-    total_wrapped   = process_dir("Wrapped",   args.wrap_dir)
-    total_unwrapped = process_dir("Unwrapped", args.unwrap_dir)
+    total_wrapped = 0
+    total_unwrapped = 0
+    # total_wrapped   = process_dir("Wrapped",   args.wrap_dir)
+    total_unwrapped = process_dir("Unwrapped", args.nowrap_dir)
     grand_total     = total_wrapped + total_unwrapped
 
     print("=" * 40)
@@ -86,3 +112,9 @@ if __name__ == "__main__":
     print(f"GRAND TOTAL:           {grand_total} sheets")
     print("=" * 40)
 
+
+'''
+python scripts/1_cv/sheet_counter_poc.py \
+    --wrap_dir   data/raw/wrap_images \
+    --nowrap_dir data/raw/nowrap_images 
+'''
